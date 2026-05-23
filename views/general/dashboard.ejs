@@ -1,0 +1,410 @@
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+  <title><%= settings.name %> — Dashboard</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet"/>
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css" rel="stylesheet"/>
+  <style>
+    * { box-sizing: border-box; }
+    body { background: #080808; color: #f0f0f0; font-family: 'Inter', system-ui, sans-serif; }
+
+    /* Animations */
+    @keyframes fadeSlideUp {
+      from { opacity: 0; transform: translateY(16px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes scanline {
+      0%   { transform: translateY(-100%); }
+      100% { transform: translateY(100vh); }
+    }
+    @keyframes borderGlow {
+      0%, 100% { border-color: rgba(255,255,255,0.1); }
+      50%       { border-color: rgba(255,255,255,0.3); }
+    }
+    @keyframes barFill {
+      from { width: 0%; }
+    }
+    @keyframes countUp {
+      from { opacity: 0; transform: scale(0.8); }
+      to   { opacity: 1; transform: scale(1); }
+    }
+    @keyframes shimmer {
+      0%   { background-position: -200% 0; }
+      100% { background-position: 200% 0; }
+    }
+    @keyframes pulse-ring {
+      0%   { box-shadow: 0 0 0 0 rgba(255,255,255,0.15); }
+      100% { box-shadow: 0 0 0 12px rgba(255,255,255,0); }
+    }
+
+    .fade-slide-up { animation: fadeSlideUp 0.4s ease both; }
+    .delay-1 { animation-delay: 0.05s; }
+    .delay-2 { animation-delay: 0.10s; }
+    .delay-3 { animation-delay: 0.15s; }
+    .delay-4 { animation-delay: 0.20s; }
+    .delay-5 { animation-delay: 0.25s; }
+    .delay-6 { animation-delay: 0.30s; }
+
+    .card-bw {
+      background: #111; border: 1px solid rgba(255,255,255,0.09);
+      border-radius: 1rem; padding: 1.25rem;
+      transition: border-color 0.25s, transform 0.2s, box-shadow 0.2s;
+      animation: borderGlow 4s infinite;
+    }
+    .card-bw:hover {
+      border-color: rgba(255,255,255,0.25);
+      transform: translateY(-2px);
+      box-shadow: 0 8px 32px rgba(0,0,0,0.5), 0 0 16px rgba(255,255,255,0.05);
+    }
+
+    .stat-number {
+      font-size: 1.75rem; font-weight: 700; color: #fff;
+      animation: countUp 0.5s ease both;
+    }
+
+    .progress-bar-bg {
+      height: 6px; border-radius: 99px;
+      background: rgba(255,255,255,0.08); overflow: hidden;
+    }
+    .progress-bar-fill {
+      height: 100%; border-radius: 99px;
+      background: linear-gradient(90deg, #fff 0%, #aaa 100%);
+      animation: barFill 1s ease both;
+      transition: width 0.8s ease;
+    }
+    .progress-bar-fill.warn  { background: linear-gradient(90deg, #f5f5f5 0%, #bbb 100%); }
+    .progress-bar-fill.crit  { background: linear-gradient(90deg, #fff 0%, #666 100%); }
+
+    /* Server card */
+    .server-card {
+      background: #111; border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 1rem; overflow: hidden;
+      transition: all 0.25s ease;
+    }
+    .server-card:hover {
+      border-color: rgba(255,255,255,0.22);
+      box-shadow: 0 4px 24px rgba(0,0,0,0.5);
+      transform: translateY(-2px);
+    }
+    .server-header {
+      height: 5rem; 
+      background: linear-gradient(135deg, #1a1a1a 0%, #0d0d0d 50%, #1a1a1a 100%);
+      background-size: 200% 200%;
+      animation: shimmer 4s infinite linear;
+      position: relative;
+    }
+    .server-header::after {
+      content: '';
+      position: absolute; inset: 0;
+      background: linear-gradient(to bottom, transparent 40%, #111 100%);
+    }
+
+    /* Welcome banner */
+    .welcome-banner {
+      background: linear-gradient(135deg, #111 0%, #1a1a1a 50%, #111 100%);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 1.25rem; padding: 2rem;
+      position: relative; overflow: hidden;
+    }
+    .welcome-banner::before {
+      content: '';
+      position: absolute; top: 0; left: -100%;
+      width: 60%; height: 2px;
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent);
+      animation: scanline 4s infinite linear;
+    }
+
+    /* Icon wrapper */
+    .stat-icon {
+      width: 2.25rem; height: 2.25rem; border-radius: 0.5rem;
+      background: rgba(255,255,255,0.07); border: 1px solid rgba(255,255,255,0.1);
+      display: flex; align-items: center; justify-content: center;
+      color: #ccc; margin-bottom: 0.75rem;
+    }
+
+    /* Action buttons */
+    .btn-ghost {
+      display: inline-flex; align-items: center; gap: 0.35rem;
+      padding: 0.3rem 0.65rem; border-radius: 9999px;
+      font-size: 0.75rem; font-weight: 500;
+      background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.12);
+      color: #d1d5db; transition: all 0.2s;
+    }
+    .btn-ghost:hover {
+      background: #fff; color: #000; border-color: #fff;
+      box-shadow: 0 0 12px rgba(255,255,255,0.2);
+    }
+    .btn-danger {
+      display: inline-flex; align-items: center; gap: 0.35rem;
+      padding: 0.3rem 0.65rem; border-radius: 9999px;
+      font-size: 0.75rem; font-weight: 500;
+      background: rgba(239,68,68,0.12); border: 1px solid rgba(239,68,68,0.25);
+      color: #f87171; transition: all 0.2s;
+    }
+    .btn-danger:hover {
+      background: #ef4444; color: #fff; border-color: #ef4444;
+    }
+
+    /* Alert */
+    .alert-bw {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0.85rem 1rem; border-radius: 0.75rem; margin: 0.5rem 0;
+      border: 1px solid;
+    }
+    .alert-bw.error   { background: rgba(239,68,68,0.08); border-color: rgba(239,68,68,0.2); color: #f87171; }
+    .alert-bw.success { background: rgba(255,255,255,0.05); border-color: rgba(255,255,255,0.1); color: #d1d5db; }
+
+    /* Section header */
+    .section-header {
+      font-size: 1.25rem; font-weight: 700; color: #fff;
+      display: flex; align-items: center; gap: 0.6rem; margin-bottom: 1rem;
+    }
+    .section-header::after {
+      content: ''; flex: 1; height: 1px;
+      background: linear-gradient(90deg, rgba(255,255,255,0.12), transparent);
+    }
+  </style>
+</head>
+
+<body>
+  <div class="flex flex-col md:flex-row min-h-screen w-full">
+
+    <!-- Sidebar -->
+    <%- include('../components/navigation') %>
+
+    <!-- Main Content -->
+    <main class="flex-1 px-4 py-6 pb-24 md:pb-6 max-w-7xl mx-auto w-full">
+
+      <!-- Welcome Banner -->
+      <div class="welcome-banner mb-6 fade-slide-up delay-1">
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div>
+            <h1 class="text-2xl sm:text-3xl font-bold text-white mb-1">
+              Welcome back, <span class="text-gray-300"><%= req.session.userinfo.username %></span> 👾
+            </h1>
+            <p class="text-gray-500 text-sm">Manage your servers and resources from here.</p>
+          </div>
+          <div class="flex items-center gap-3">
+            <div class="text-right">
+              <div class="text-xs text-gray-500 uppercase tracking-widest">Balance</div>
+              <div class="text-lg font-bold text-white"><%= coins %> <span class="text-gray-400 text-sm font-normal"><%= settings.api.client.coins.name %></span></div>
+            </div>
+            <a href="/earn" class="px-4 py-2 rounded-lg bg-white text-black text-sm font-semibold hover:bg-gray-200 transition-all hover:scale-95">
+              + Earn
+            </a>
+          </div>
+        </div>
+      </div>
+
+      <!-- Alerts -->
+      <% if (req.query.err === "CANNOTAFFORDRENEWAL") { %>
+      <div class="alert-bw error fade-slide-up">
+        <span>You need at least <%= settings.renewals.cost %> <%= settings.api.client.coins.name %> to renew a server.</span>
+        <svg class="w-4 h-4 cursor-pointer flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" onclick="this.closest('.alert-bw').remove()"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+      </div>
+      <% } if (req.query.err == 'DELETED') { %>
+      <div class="alert-bw success fade-slide-up">
+        <span>Server deleted. You can create a new one anytime.</span>
+        <svg class="w-4 h-4 cursor-pointer flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" onclick="this.closest('.alert-bw').remove()"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+      </div>
+      <% } if (req.query.success === 'RENEWED') { %>
+      <div class="alert-bw success fade-slide-up">
+        <span>Server renewal purchased successfully!</span>
+        <svg class="w-4 h-4 cursor-pointer flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" onclick="this.closest('.alert-bw').remove()"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+      </div>
+      <% } %>
+
+      <!-- Announcement -->
+      <% if (settings.announcements && settings.announcements.enabled && settings.announcements.message) { %>
+      <div class="card-bw mb-4 fade-slide-up border-white/15">
+        <div class="flex items-start gap-3">
+          <div class="stat-icon mt-0.5"><i class="fas fa-bullhorn text-xs"></i></div>
+          <p class="text-sm text-gray-300 leading-relaxed"><%= settings.announcements.message %></p>
+        </div>
+      </div>
+      <% } %>
+
+      <%
+        let ram = 0, disk = 0, cpu = 0;
+        let serversUsed = pterodactyl.relationships.servers.data.length;
+        for (let i = 0; i < serversUsed; i++) {
+          ram  += typeof pterodactyl.relationships.servers.data[i].attributes.limits.memory === "number" ? pterodactyl.relationships.servers.data[i].attributes.limits.memory : 0;
+          disk += typeof pterodactyl.relationships.servers.data[i].attributes.limits.disk   === "number" ? pterodactyl.relationships.servers.data[i].attributes.limits.disk   : 0;
+          cpu  += typeof pterodactyl.relationships.servers.data[i].attributes.limits.cpu    === "number" ? pterodactyl.relationships.servers.data[i].attributes.limits.cpu    : 0;
+        }
+        const totalServers = (packages ? packages.servers : 0) + extraresources.servers;
+        const totalRAM     = (packages ? packages.ram     : 0) + extraresources.ram;
+        const totalDisk    = (packages ? packages.disk    : 0) + extraresources.disk;
+        const totalCPU     = (packages ? packages.cpu     : 0) + extraresources.cpu;
+        const availableRAM  = totalRAM  - ram;
+        const availableDisk = totalDisk - disk;
+        const availableCPU  = totalCPU  - cpu;
+        const serversRemaining = totalServers - serversUsed;
+        const pct = (u, t) => t > 0 ? Math.min(Math.round((u/t)*100), 100) : 0;
+        const sp = pct(serversUsed, totalServers);
+        const rp = pct(ram, totalRAM);
+        const dp = pct(disk, totalDisk);
+        const cp = pct(cpu, totalCPU);
+        const barClass = (p) => p >= 75 ? 'crit' : p >= 50 ? 'warn' : '';
+      %>
+
+      <!-- Resource Stats -->
+      <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
+
+        <!-- Servers -->
+        <div class="card-bw fade-slide-up delay-2">
+          <div class="stat-icon"><i class="fas fa-server text-xs"></i></div>
+          <div class="text-xs text-gray-500 uppercase tracking-widest mb-0.5">Servers</div>
+          <div class="stat-number delay-2"><%= serversRemaining %><span class="text-gray-600 text-base font-normal"> / <%= totalServers %></span></div>
+          <div class="text-xs text-gray-500 mt-1 mb-2">slots remaining</div>
+          <div class="progress-bar-bg"><div class="progress-bar-fill <%= barClass(sp) %>" style="width: <%= sp %>%"></div></div>
+        </div>
+
+        <!-- RAM -->
+        <div class="card-bw fade-slide-up delay-3">
+          <div class="stat-icon"><i class="fas fa-memory text-xs"></i></div>
+          <div class="text-xs text-gray-500 uppercase tracking-widest mb-0.5">Memory</div>
+          <div class="stat-number delay-3"><%= (availableRAM/1024).toFixed(1) %><span class="text-gray-600 text-base font-normal"> GB</span></div>
+          <div class="text-xs text-gray-500 mt-1 mb-2">of <%= (totalRAM/1024).toFixed(1) %> GB free</div>
+          <div class="progress-bar-bg"><div class="progress-bar-fill <%= barClass(rp) %>" style="width: <%= rp %>%"></div></div>
+        </div>
+
+        <!-- CPU -->
+        <div class="card-bw fade-slide-up delay-4">
+          <div class="stat-icon"><i class="fas fa-microchip text-xs"></i></div>
+          <div class="text-xs text-gray-500 uppercase tracking-widest mb-0.5">CPU</div>
+          <div class="stat-number delay-4"><%= availableCPU %><span class="text-gray-600 text-base font-normal"> %</span></div>
+          <div class="text-xs text-gray-500 mt-1 mb-2">of <%= totalCPU %>% available</div>
+          <div class="progress-bar-bg"><div class="progress-bar-fill <%= barClass(cp) %>" style="width: <%= cp %>%"></div></div>
+        </div>
+
+        <!-- Disk -->
+        <div class="card-bw fade-slide-up delay-5">
+          <div class="stat-icon"><i class="fas fa-hdd text-xs"></i></div>
+          <div class="text-xs text-gray-500 uppercase tracking-widest mb-0.5">Disk</div>
+          <div class="stat-number delay-5"><%= (availableDisk/1024).toFixed(1) %><span class="text-gray-600 text-base font-normal"> GB</span></div>
+          <div class="text-xs text-gray-500 mt-1 mb-2">of <%= (totalDisk/1024).toFixed(1) %> GB free</div>
+          <div class="progress-bar-bg"><div class="progress-bar-fill <%= barClass(dp) %>" style="width: <%= dp %>%"></div></div>
+        </div>
+
+      </div>
+
+      <!-- Servers Section -->
+      <div class="section-header fade-slide-up delay-5">
+        <i class="fas fa-server text-gray-400 text-sm"></i>
+        Your Servers
+        <span class="ml-1 text-sm text-gray-500 font-normal">&nbsp;<%= serversUsed %> active</span>
+      </div>
+
+      <% if (pterodactyl.relationships.servers.data.length === 0) { %>
+      <a href="/servers/new">
+        <div class="card-bw flex flex-col items-center justify-center py-16 gap-4 hover:border-white/30 fade-slide-up delay-6 cursor-pointer">
+          <img src="/assets/empty.svg" class="w-40 opacity-40" alt="No servers">
+          <p class="text-gray-400 text-sm">You don't have any servers yet.</p>
+          <span class="px-5 py-2 rounded-lg bg-white text-black text-sm font-semibold hover:bg-gray-200 transition-all hover:scale-95">
+            Create your first server
+          </span>
+        </div>
+      </a>
+      <% } else { %>
+
+      <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+        <% for (let i = 0; i < pterodactyl.relationships.servers.data.length; i++) { %>
+        <% const srv = pterodactyl.relationships.servers.data[i].attributes; %>
+        <div class="server-card fade-slide-up" style="animation-delay: <%= 0.05 * (i % 6) + 0.3 %>s">
+
+          <!-- Card header decoration -->
+          <div class="server-header">
+            <div class="absolute inset-0 flex items-center justify-center opacity-10">
+              <i class="fas fa-server text-4xl text-white"></i>
+            </div>
+            <!-- Renew badge -->
+            <% if (settings.renewals && settings.renewals.status) { %>
+            <div class="absolute top-3 right-3 z-10">
+              <div id="renew-status-btn-<%= srv.id %>"
+                class="flex items-center gap-1.5 px-2 py-1 rounded-full text-xs bg-black/60 border border-white/20 text-white backdrop-blur-sm">
+                <i class="fas fa-sync-alt text-xs"></i>
+                <span>Loading…</span>
+              </div>
+              <script>
+                (function() {
+                  async function fetchRenewalStatus(serverId) {
+                    try {
+                      const res = await fetch(`/api/renewalstatus?id=${serverId}`);
+                      const data = await res.json();
+                      const btn = document.getElementById(`renew-status-btn-${serverId}`);
+                      if (!btn) return;
+                      if (data.error || data.text === 'Disabled') {
+                        btn.querySelector('span').textContent = 'No renewals';
+                        return;
+                      }
+                      if (data.text === 'Renewed') {
+                        btn.querySelector('span').textContent = 'Active';
+                        btn.classList.add('border-white/30');
+                        return;
+                      }
+                      btn.querySelector('span').textContent = data.text || 'Active';
+                    } catch(e) { /* ignore */ }
+                  }
+                  fetchRenewalStatus('<%= srv.id %>');
+                })();
+              </script>
+            </div>
+            <% } %>
+          </div>
+
+          <!-- Card body -->
+          <div class="p-4">
+            <div class="mb-3">
+              <h3 class="font-bold text-white text-base truncate"><%= srv.name.length > 20 ? srv.name.slice(0,18)+'…' : srv.name %></h3>
+              <p class="text-xs text-gray-500 truncate mt-0.5">
+                <%= srv.description ? srv.description : 'No description' %>
+              </p>
+            </div>
+
+            <!-- Limits grid -->
+            <div class="grid grid-cols-3 gap-2 mb-4">
+              <div class="bg-black/30 rounded-lg p-2 text-center border border-white/5">
+                <div class="text-xs text-gray-500 mb-0.5">CPU</div>
+                <div class="text-sm font-semibold text-white"><%= srv.limits.cpu %>%</div>
+              </div>
+              <div class="bg-black/30 rounded-lg p-2 text-center border border-white/5">
+                <div class="text-xs text-gray-500 mb-0.5">RAM</div>
+                <div class="text-sm font-semibold text-white"><%= srv.limits.memory %>MB</div>
+              </div>
+              <div class="bg-black/30 rounded-lg p-2 text-center border border-white/5">
+                <div class="text-xs text-gray-500 mb-0.5">Disk</div>
+                <div class="text-sm font-semibold text-white"><%= srv.limits.disk %>MB</div>
+              </div>
+            </div>
+
+            <!-- Actions -->
+            <div class="flex flex-wrap gap-1.5">
+              <a href="<%= settings.pterodactyl.domain %>/server/<%= srv.uuid %>" target="_blank" rel="noreferrer" class="btn-ghost">
+                <i class="fas fa-external-link-alt text-xs"></i> Open
+              </a>
+              <a href="/edit?id=<%= srv.id %>" class="btn-ghost">
+                <i class="fas fa-pen text-xs"></i> Edit
+              </a>
+              <% if (settings.renewals && settings.renewals.status) { %>
+              <a href="/renew?id=<%= srv.id %>" class="btn-ghost">
+                <i class="fas fa-sync-alt text-xs"></i> Renew
+              </a>
+              <% } %>
+              <a href="/delete?id=<%= srv.id %>" class="btn-danger ml-auto">
+                <i class="fas fa-trash text-xs"></i> Delete
+              </a>
+            </div>
+          </div>
+        </div>
+        <% } %>
+      </div>
+      <% } %>
+
+      <%- include('../components/footer') %>
+    </main>
+  </div>
+</body>
+</html>
