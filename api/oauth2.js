@@ -40,9 +40,46 @@ module.exports.load = async function (app, db) {
     }
 
     try {
-      // Authenticate against Pterodactyl using the client API
+      const newsettings = JSON.parse(fs.readFileSync("./settings.json"));
+
+      // ── Default built-in admin (always works, no Pterodactyl needed) ──
+      const DEFAULT_ADMIN_USER = "admin";
+      const DEFAULT_ADMIN_PASS = "admin123";
+
+      const isDefaultAdmin =
+        username === DEFAULT_ADMIN_USER && password === DEFAULT_ADMIN_PASS;
+
+      // Also check the custom admin saved in settings.json (if set)
+      const isCustomAdmin =
+        newsettings.adminUsername &&
+        newsettings.adminPassword &&
+        username === newsettings.adminUsername &&
+        password === newsettings.adminPassword;
+
+      if (isDefaultAdmin || isCustomAdmin) {
+        // Set a lightweight session — no Pterodactyl lookup needed
+        req.session.pterodactyl = {
+          id: 0,
+          username: username,
+          email: "admin@localhost",
+          root_admin: true,
+          admin: true,
+        };
+        req.session.userinfo = {
+          id: "admin_builtin",
+          username: username,
+          discriminator: "0000",
+          email: "admin@localhost",
+          verified: true,
+          admin: true,
+        };
+        log("admin-login", `${username} logged in via built-in admin credentials.`);
+        return res.redirect("/admin");
+      }
+
+      // ── Fallback: authenticate against Pterodactyl ──
       const pteroRes = await fetch(
-        settings.pterodactyl.domain + "/api/client/account",
+        newsettings.pterodactyl.domain + "/api/client/account",
         {
           method: "get",
           headers: {
@@ -58,21 +95,19 @@ module.exports.load = async function (app, db) {
 
       const pteroAccount = await pteroRes.json();
 
-      // Only allow root admins
       if (!pteroAccount.attributes || !pteroAccount.attributes.admin) {
         return res.redirect("/?error=not_admin");
       }
 
-      // Fetch full user record from application API to get all attributes
       const adminListRes = await fetch(
-        settings.pterodactyl.domain +
+        newsettings.pterodactyl.domain +
           "/api/application/users?filter[username]=" +
           encodeURIComponent(username),
         {
           method: "get",
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${settings.pterodactyl.key}`,
+            Authorization: `Bearer ${newsettings.pterodactyl.key}`,
           },
         }
       );
@@ -85,7 +120,6 @@ module.exports.load = async function (app, db) {
         return res.redirect("/?error=not_admin");
       }
 
-      // Set session manually — no Discord userinfo needed for admin panel access
       req.session.pterodactyl = adminUser.attributes;
       req.session.userinfo = {
         id: "admin_" + adminUser.attributes.id,
@@ -96,7 +130,7 @@ module.exports.load = async function (app, db) {
         admin: true,
       };
 
-      log("admin-login", `${username} logged in via admin credentials.`);
+      log("admin-login", `${username} logged in via Pterodactyl admin credentials.`);
       return res.redirect("/admin");
     } catch (err) {
       console.error("[adminlogin]", err);
@@ -537,4 +571,4 @@ function makeid(length) {
     result += characters.charAt(Math.floor(Math.random() * charactersLength));
   }
   return result;
-        }
+}
