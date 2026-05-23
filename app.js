@@ -120,6 +120,8 @@ if (cluster.isMaster) {
     type: "application/json"
   }));
 
+  app.use(express.urlencoded({ extended: false, limit: "500kb" }));
+
   app.listen(settings.website.port);
 
   // Rate limiting
