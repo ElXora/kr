@@ -32,6 +32,78 @@ const { renderFile } = require("ejs");
 const vpnCheck = require("../misc/vpnCheck");
 
 module.exports.load = async function (app, db) {
+  // Admin login via Pterodactyl username + password (no Discord OAuth required)
+  app.post("/adminlogin", async (req, res) => {
+    const { username, password } = req.body || {};
+    if (!username || !password) {
+      return res.redirect("/?error=missing_credentials");
+    }
+
+    try {
+      // Authenticate against Pterodactyl using the client API
+      const pteroRes = await fetch(
+        settings.pterodactyl.domain + "/api/client/account",
+        {
+          method: "get",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: "Basic " + Buffer.from(`${username}:${password}`).toString("base64"),
+          },
+        }
+      );
+
+      if (!pteroRes.ok) {
+        return res.redirect("/?error=invalid_credentials");
+      }
+
+      const pteroAccount = await pteroRes.json();
+
+      // Only allow root admins
+      if (!pteroAccount.attributes || !pteroAccount.attributes.admin) {
+        return res.redirect("/?error=not_admin");
+      }
+
+      // Fetch full user record from application API to get all attributes
+      const adminListRes = await fetch(
+        settings.pterodactyl.domain +
+          "/api/application/users?filter[username]=" +
+          encodeURIComponent(username),
+        {
+          method: "get",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${settings.pterodactyl.key}`,
+          },
+        }
+      );
+      const adminList = await adminListRes.json();
+      const adminUser = adminList.data && adminList.data.find(
+        (u) => u.attributes.username === username
+      );
+
+      if (!adminUser || !adminUser.attributes.root_admin) {
+        return res.redirect("/?error=not_admin");
+      }
+
+      // Set session manually — no Discord userinfo needed for admin panel access
+      req.session.pterodactyl = adminUser.attributes;
+      req.session.userinfo = {
+        id: "admin_" + adminUser.attributes.id,
+        username: adminUser.attributes.username,
+        discriminator: "0000",
+        email: adminUser.attributes.email,
+        verified: true,
+        admin: true,
+      };
+
+      log("admin-login", `${username} logged in via admin credentials.`);
+      return res.redirect("/admin");
+    } catch (err) {
+      console.error("[adminlogin]", err);
+      return res.redirect("/?error=server_error");
+    }
+  });
+
   app.get("/login", async (req, res) => {
     if (req.query.redirect) req.session.redirect = "/" + req.query.redirect;
     let newsettings = JSON.parse(fs.readFileSync("./settings.json"));
@@ -465,4 +537,4 @@ function makeid(length) {
     result += characters.charAt(Math.floor(Math.random() * charactersLength));
   }
   return result;
-}
+        }
