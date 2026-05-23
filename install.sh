@@ -68,6 +68,10 @@ ask "→ Your admin email:"
 read -rp "  Email: " ADMIN_EMAIL
 if [ -z "$ADMIN_EMAIL" ]; then fail "Admin email cannot be empty."; fi
 
+ask "→ Your admin username (Pterodactyl username for admin panel login):"
+read -rp "  Username: " ADMIN_USERNAME
+if [ -z "$ADMIN_USERNAME" ]; then fail "Admin username cannot be empty."; fi
+
 ask "→ Port for Kroxy (press Enter for default 3001):"
 read -rp "  Port: " APP_PORT
 APP_PORT="${APP_PORT:-3001}"
@@ -96,6 +100,7 @@ echo -e "${DIM}  ─────────────────────
 echo -e "  ${WHITE}${BOLD}Summary${RESET}"
 dim "  Panel URL   : $PANEL_URL"
 dim "  Admin Email : $ADMIN_EMAIL"
+dim "  Admin User  : $ADMIN_USERNAME"
 dim "  Port        : $APP_PORT"
 dim "  Install Dir : $INSTALL_DIR"
 dim "  API Key     : set manually in settings.json after install"
@@ -179,6 +184,7 @@ cat > "$SETTINGS_FILE" << SETTINGS
 {
   "name": "Kroxy",
   "logo": "https://avatars.githubusercontent.com/u/188295803?s=400&v=4",
+  "adminUsername": "${ADMIN_USERNAME}",
   "pterodactyl": {
     "domain": "${PANEL_URL}",
     "key": "ptla_REPLACEME"
