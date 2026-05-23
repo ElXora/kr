@@ -9,7 +9,7 @@
 #   ╚═╝  ╚═╝╚═╝  ╚═╝ ╚═════╝ ╚═╝  ╚═╝   ╚═╝
 #
 #   Kroxy Panel — One-Command Installer
-#   Premium Theme | Best panel ever
+#   Black & White Theme | Heliactyl Base
 # ============================================================
 # NO set -e — every error is handled manually so nothing
 # silently exits mid-install.
@@ -192,6 +192,10 @@ cat > "$SETTINGS_FILE" << SETTINGS
   "logo": "https://avatars.githubusercontent.com/u/188295803?s=400&v=4",
   "adminUsername": "${ADMIN_USERNAME}",
   "adminPassword": "${ADMIN_PASSWORD}",
+  "defaultAdmin": {
+    "username": "admin",
+    "password": "admin123"
+  },
   "pterodactyl": {
     "domain": "${PANEL_URL}",
     "key": "ptla_REPLACEME"
