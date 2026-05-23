@@ -9,10 +9,7 @@
 #   ╚═╝  ╚═╝╚═╝  ╚═╝ ╚═════╝ ╚═╝  ╚═╝   ╚═╝
 #
 #   Kroxy Panel — One-Command Installer
-#   Black & White Theme | Heliactyl Base
 # ============================================================
-# NO set -e — every error is handled manually so nothing
-# silently exits mid-install.
 
 RESET='\033[0m'; BOLD='\033[1m'; WHITE='\033[1;37m'
 GRAY='\033[0;37m'; DIM='\033[2m'; RED='\033[0;31m'
@@ -27,9 +24,8 @@ ask()  { echo -e "\n${WHITE}${BOLD}$1${RESET}"; }
 
 INSTALL_DIR="/opt/kroxy"
 SERVICE_NAME="kroxy"
-ALREADY_INSTALLED=false
 
-# ── Banner ─────────────────────────────────────────────────
+# ── Banner ──────────────────────────────────────────────────
 clear
 echo -e "${WHITE}${BOLD}"
 cat << 'BANNER'
@@ -42,33 +38,34 @@ cat << 'BANNER'
   ╚═╝  ╚═╝╚═╝  ╚═╝ ╚═════╝ ╚═╝  ╚═╝   ╚═╝
 
 BANNER
-echo -e "${RESET}${GRAY}  Kroxy Panel Installer — Black & White Edition${RESET}"
+echo -e "${RESET}${GRAY}  Kroxy Panel Installer${RESET}"
 echo -e "${DIM}  ─────────────────────────────────────────────${RESET}"
 sleep 0.4
 
-# ── Root check ─────────────────────────────────────────────
+# ── Root check ──────────────────────────────────────────────
 if [ "$(id -u)" -ne 0 ]; then
   fail "Run as root: sudo bash install.sh"
 fi
 
-# ── Already installed check ────────────────────────────────
-if [ -f "$INSTALL_DIR/app.js" ]; then
-  ALREADY_INSTALLED=true
-  warn "Kroxy already found at $INSTALL_DIR — skipping dependency install."
-fi
+# ── User input ──────────────────────────────────────────────
+ask "→ Panel name (press Enter for default: Kroxy):"
+read -rp "  Name: " PANEL_NAME
+PANEL_NAME="${PANEL_NAME:-Kroxy}"
 
-# ── User input ─────────────────────────────────────────────
 ask "→ Pterodactyl panel URL (e.g. https://panel.yourdomain.com):"
 read -rp "  URL: " PANEL_URL
 if [ -z "$PANEL_URL" ]; then fail "Panel URL cannot be empty."; fi
-# Strip trailing slash
 PANEL_URL="${PANEL_URL%/}"
+
+ask "→ Pterodactyl Application API key (starts with ptla_):"
+read -rp "  API Key: " PTERO_KEY
+if [ -z "$PTERO_KEY" ]; then fail "API key cannot be empty."; fi
 
 ask "→ Your admin email:"
 read -rp "  Email: " ADMIN_EMAIL
 if [ -z "$ADMIN_EMAIL" ]; then fail "Admin email cannot be empty."; fi
 
-ask "→ Your admin username (Pterodactyl username for admin panel login):"
+ask "→ Your admin username (for admin panel login):"
 read -rp "  Username: " ADMIN_USERNAME
 if [ -z "$ADMIN_USERNAME" ]; then fail "Admin username cannot be empty."; fi
 
@@ -89,9 +86,14 @@ ask "→ Discord OAuth Client Secret:"
 read -rp "  Client Secret: " DISCORD_CLIENT_SECRET
 if [ -z "$DISCORD_CLIENT_SECRET" ]; then fail "Discord Client Secret cannot be empty."; fi
 
-ask "→ Discord Bot Token (optional — press Enter to skip):"
+ask "→ Discord Bot Token (press Enter to skip):"
 read -rp "  Bot Token: " DISCORD_BOT_TOKEN
 DISCORD_BOT_TOKEN="${DISCORD_BOT_TOKEN:-placeholder}"
+
+ask "→ Dashboard domain (e.g. https://dash.yourdomain.com) — used for Discord OAuth callback:"
+read -rp "  Domain: " DASH_DOMAIN
+if [ -z "$DASH_DOMAIN" ]; then fail "Dashboard domain cannot be empty."; fi
+DASH_DOMAIN="${DASH_DOMAIN%/}"
 
 ask "→ Session secret (press Enter to auto-generate):"
 read -rp "  Secret: " SESSION_SECRET
@@ -103,13 +105,14 @@ fi
 echo ""
 echo -e "${DIM}  ─────────────────────────────────────────────${RESET}"
 echo -e "  ${WHITE}${BOLD}Summary${RESET}"
+dim "  Panel Name  : $PANEL_NAME"
 dim "  Panel URL   : $PANEL_URL"
+dim "  Dashboard   : $DASH_DOMAIN"
 dim "  Admin Email : $ADMIN_EMAIL"
 dim "  Admin User  : $ADMIN_USERNAME"
 dim "  Admin Pass  : ********"
 dim "  Port        : $APP_PORT"
 dim "  Install Dir : $INSTALL_DIR"
-dim "  API Key     : set manually in settings.json after install"
 echo -e "${DIM}  ─────────────────────────────────────────────${RESET}"
 echo ""
 ask "→ Proceed? (y/N):"
@@ -119,52 +122,39 @@ if [ "$CONFIRM_LOWER" != "y" ] && [ "$CONFIRM_LOWER" != "yes" ]; then
   echo -e "\n${GRAY}  Cancelled.${RESET}\n"; exit 0
 fi
 
-# ── Dependencies ───────────────────────────────────────────
-if [ "$ALREADY_INSTALLED" = false ]; then
+# ── Dependencies ─────────────────────────────────────────────
+step "Updating packages..."
+apt-get update -qq 2>/dev/null || warn "apt-get update had warnings — continuing."
+apt-get install -y curl git unzip sqlite3 2>/dev/null || warn "Some packages may have warnings — continuing."
+ok "System packages ready."
 
-  step "Updating packages..."
-  apt-get update -qq 2>/dev/null || warn "apt-get update had warnings — continuing."
-  apt-get install -y curl git unzip sqlite3 2>/dev/null || warn "Some packages may have warnings — continuing."
-  ok "System packages ready."
-
-  step "Installing Node.js 20..."
-  NODE_OK=false
-  if command -v node > /dev/null 2>&1; then
-    NODE_VER=$(node -v 2>/dev/null | cut -d. -f1 | tr -d 'v')
-    if [ "$NODE_VER" -ge 18 ] 2>/dev/null; then
-      ok "Node.js $(node -v) already present — skipping."
-      NODE_OK=true
-    fi
+step "Installing Node.js 20..."
+NODE_OK=false
+if command -v node > /dev/null 2>&1; then
+  NODE_VER=$(node -v 2>/dev/null | cut -d. -f1 | tr -d 'v')
+  if [ "$NODE_VER" -ge 18 ] 2>/dev/null; then
+    ok "Node.js $(node -v) already present — skipping."
+    NODE_OK=true
   fi
-  if [ "$NODE_OK" = false ]; then
-    curl -fsSL https://deb.nodesource.com/setup_20.x | bash - > /dev/null 2>&1 || warn "nodesource setup had warnings."
-    apt-get install -y nodejs > /dev/null 2>&1 || fail "Node.js install failed."
-    ok "Node.js $(node -v) installed."
-  fi
-
-  step "Installing PM2..."
-  if command -v pm2 > /dev/null 2>&1; then
-    ok "PM2 already present — skipping."
-  else
-    npm install -g pm2 > /dev/null 2>&1 || fail "PM2 install failed."
-    ok "PM2 installed."
-  fi
-
-else
-  step "Skipping dependency install (already installed)."
-  NODE_VER=$(node -v 2>/dev/null || echo "not found")
-  PM2_VER=$(pm2 -v 2>/dev/null || echo "not found")
-  ok "Node.js $NODE_VER"
-  ok "PM2 $PM2_VER"
+fi
+if [ "$NODE_OK" = false ]; then
+  curl -fsSL https://deb.nodesource.com/setup_20.x | bash - > /dev/null 2>&1 || warn "nodesource setup had warnings."
+  apt-get install -y nodejs > /dev/null 2>&1 || fail "Node.js install failed."
+  ok "Node.js $(node -v) installed."
 fi
 
-# ── Copy files ─────────────────────────────────────────────
+step "Installing PM2..."
+if command -v pm2 > /dev/null 2>&1; then
+  ok "PM2 already present — skipping."
+else
+  npm install -g pm2 > /dev/null 2>&1 || fail "PM2 install failed."
+  ok "PM2 installed."
+fi
+
+# ── Copy files ───────────────────────────────────────────────
 step "Copying Kroxy files..."
-
 pm2 stop "$SERVICE_NAME" > /dev/null 2>&1 || true
-
 mkdir -p "$INSTALL_DIR"
-
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
 if [ -f "$SCRIPT_DIR/app.js" ]; then
@@ -174,21 +164,75 @@ else
   fail "app.js not found. Place install.sh in the same folder as the Kroxy panel files."
 fi
 
-# ── Write settings.json ────────────────────────────────────
+# ── Remove Shadowless / Heliactyl / Xalora branding ──────────
+step "Removing Shadowless/Heliactyl/Xalora branding..."
+
+# Rewrite README
+cat > "$INSTALL_DIR/README.md" << 'README'
+# Kroxy Panel
+
+A modern client panel for Pterodactyl.
+
+## Features
+- Resource Management
+- Coins (AFK Page Earning, Linkvertise earning)
+- Renewal system
+- Server management (create, view, edit)
+- User system (auth, regen password)
+- Store (buy resources with coins)
+- Dashboard
+- Admin panel (coins, resources, coupons)
+- API
+
+## Starting
+```
+pm2 start app.js --name kroxy
+pm2 logs kroxy
+pm2 restart kroxy
+```
+README
+
+# Rewrite package.json name/description
+node -e "
+const fs = require('fs');
+const p = '$INSTALL_DIR/package.json';
+const d = JSON.parse(fs.readFileSync(p));
+d.name = 'kroxy';
+d.description = 'Kroxy client panel for Pterodactyl.';
+fs.writeFileSync(p, JSON.stringify(d, null, 2));
+" 2>/dev/null || warn "Could not update package.json name."
+
+# Replace branding strings in all JS/EJS files
+find "$INSTALL_DIR" -type f \( -name "*.js" -o -name "*.ejs" \) \
+  ! -path "*/node_modules/*" \
+  ! -name "package-lock.json" | while read -r FILE; do
+    sed -i \
+      -e 's/Shadowless/Kroxy/g' \
+      -e 's/shadowless/kroxy/g' \
+      -e 's/ShadowlessDash/Kroxy/g' \
+      -e 's/Heliactyl/Kroxy/g' \
+      -e 's/heliactyl/kroxy/g' \
+      -e 's/Xalora/Kroxy/g' \
+      -e 's/xalora/kroxy/g' \
+      -e 's/XaloraClient/Kroxy/g' \
+      "$FILE" 2>/dev/null || true
+done
+
+ok "Branding replaced with Kroxy."
+
+# ── Write settings.json ──────────────────────────────────────
 step "Writing settings.json..."
 
 SETTINGS_FILE="$INSTALL_DIR/settings.json"
 
-if [ -f "$SETTINGS_FILE" ] && [ "$ALREADY_INSTALLED" = true ]; then
+if [ -f "$SETTINGS_FILE" ]; then
   cp "$SETTINGS_FILE" "${SETTINGS_FILE}.bak" 2>/dev/null || true
   dim "Backed up old settings → settings.json.bak"
 fi
 
-# Write the full valid settings.json — all required fields included
-# so app.js does NOT crash on startup with missing keys
 cat > "$SETTINGS_FILE" << SETTINGS
 {
-  "name": "Kroxy",
+  "name": "${PANEL_NAME}",
   "logo": "https://avatars.githubusercontent.com/u/188295803?s=400&v=4",
   "adminUsername": "${ADMIN_USERNAME}",
   "adminPassword": "${ADMIN_PASSWORD}",
@@ -198,7 +242,7 @@ cat > "$SETTINGS_FILE" << SETTINGS
   },
   "pterodactyl": {
     "domain": "${PANEL_URL}",
-    "key": "ptla_REPLACEME"
+    "key": "${PTERO_KEY}"
   },
   "announcements": {
     "enabled": false,
@@ -261,7 +305,7 @@ cat > "$SETTINGS_FILE" << SETTINGS
       "oauth2": {
         "id": "${DISCORD_CLIENT_ID}",
         "secret": "${DISCORD_CLIENT_SECRET}",
-        "link": "${PANEL_URL}",
+        "link": "${DASH_DOMAIN}",
         "callbackpath": "/callback",
         "prompt": false,
         "ip": {
@@ -395,48 +439,101 @@ cat > "$SETTINGS_FILE" << SETTINGS
 }
 SETTINGS
 
-ok "settings.json written (all required fields included)."
+ok "settings.json written."
 
-
-# ── Patch app.js — stop crash loop on bad API key ─────────
-step "Patching app.js crash loop..."
-APP_JS="$INSTALL_DIR/app.js"
-
-# 1. Replace the raw cluster.fork() inside the exit handler with a
-#    version that checks the API key first and stops looping if it
-#    is still the placeholder value.
-PATCH_MARKER="// kroxy-patched"
-if ! grep -q "$PATCH_MARKER" "$APP_JS" 2>/dev/null; then
-  # Wrap the cluster exit re-fork so it bails on placeholder key
-  sed -i "s|setTimeout(() => cluster.fork(), 2000);|$PATCH_MARKER\n    const _s = JSON.parse(require('fs').readFileSync('./settings.json'));\n    if (_s.pterodactyl \&\& _s.pterodactyl.key === 'ptla_REPLACEME') {\n      console.log('\\\\x1b[33m[Kroxy] API key is still ptla_REPLACEME — stopping auto-restart. Set your key then run: pm2 restart kroxy\\\\x1b[0m');\n      return;\n    }\n    setTimeout(() => cluster.fork(), 3000);|" "$APP_JS" 2>/dev/null || true
-
-  # Also replace the initial bare cluster.fork() loop (the numCPUs loop)
-  # so it only forks 1 worker instead of one per CPU — prevents flood
-  sed -i "s|for (let i = 0; i < numCPUs; i++) {|for (let i = 0; i < 1; i++) { // kroxy: single worker to avoid crash flood|" "$APP_JS" 2>/dev/null || true
-
-  ok "app.js patched — single worker, stops reforking on placeholder key."
-else
-  ok "app.js already patched."
-fi
-
-# ── npm install ────────────────────────────────────────────
+# ── npm install ──────────────────────────────────────────────
 step "Installing npm packages..."
 cd "$INSTALL_DIR" || fail "Cannot cd to $INSTALL_DIR"
 npm install > /dev/null 2>&1 || fail "npm install failed."
 ok "npm packages installed."
 
-# ── Start with PM2 ────────────────────────────────────────
+# ── Start with PM2 ───────────────────────────────────────────
 step "Starting Kroxy with PM2..."
-
 pm2 delete "$SERVICE_NAME" > /dev/null 2>&1 || true
 pm2 start app.js --name "$SERVICE_NAME" > /dev/null 2>&1 || fail "PM2 failed to start. Run: pm2 logs $SERVICE_NAME"
 pm2 save > /dev/null 2>&1 || true
 pm2 startup systemd -u root --hp /root > /dev/null 2>&1 || true
 systemctl enable pm2-root > /dev/null 2>&1 || true
-
 ok "Kroxy is running."
 
-# ── Done ──────────────────────────────────────────────────
+# ── Nginx config ─────────────────────────────────────────────
+step "Writing Nginx config..."
+DOMAIN_CLEAN=$(echo "$DASH_DOMAIN" | sed 's|https\?://||')
+
+if command -v nginx > /dev/null 2>&1; then
+  cat > "/etc/nginx/sites-available/kroxy.conf" << NGINX
+server {
+    listen 80;
+    server_name ${DOMAIN_CLEAN};
+    return 301 https://\$server_name\$request_uri;
+}
+
+server {
+    listen 443 ssl http2;
+    server_name ${DOMAIN_CLEAN};
+
+    ssl_certificate /etc/letsencrypt/live/${DOMAIN_CLEAN}/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/${DOMAIN_CLEAN}/privkey.pem;
+    ssl_session_cache shared:SSL:10m;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_prefer_server_ciphers on;
+
+    location /afk/ws {
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_pass http://localhost:${APP_PORT}/afk/ws;
+    }
+    location / {
+        proxy_pass http://localhost:${APP_PORT}/;
+        proxy_buffering off;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header Host \$host;
+    }
+}
+NGINX
+  ln -sf /etc/nginx/sites-available/kroxy.conf /etc/nginx/sites-enabled/kroxy.conf 2>/dev/null || true
+  nginx -t > /dev/null 2>&1 && systemctl reload nginx > /dev/null 2>&1 && ok "Nginx config written and reloaded." || warn "Nginx config written but reload failed — check manually."
+else
+  warn "Nginx not found — skipping config. Install nginx and use the config in /etc/nginx/sites-available/kroxy.conf manually."
+  mkdir -p /etc/nginx/sites-available
+  cat > "/etc/nginx/sites-available/kroxy.conf" << NGINX
+server {
+    listen 80;
+    server_name ${DOMAIN_CLEAN};
+    return 301 https://\$server_name\$request_uri;
+}
+
+server {
+    listen 443 ssl http2;
+    server_name ${DOMAIN_CLEAN};
+
+    ssl_certificate /etc/letsencrypt/live/${DOMAIN_CLEAN}/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/${DOMAIN_CLEAN}/privkey.pem;
+    ssl_session_cache shared:SSL:10m;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_prefer_server_ciphers on;
+
+    location /afk/ws {
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_pass http://localhost:${APP_PORT}/afk/ws;
+    }
+    location / {
+        proxy_pass http://localhost:${APP_PORT}/;
+        proxy_buffering off;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header Host \$host;
+    }
+}
+NGINX
+  dim "Nginx config saved to /etc/nginx/sites-available/kroxy.conf for when you install nginx."
+fi
+
+# ── Done ─────────────────────────────────────────────────────
 echo ""
 echo -e "${WHITE}${BOLD}"
 cat << 'DONE'
@@ -445,15 +542,14 @@ cat << 'DONE'
   └─────────────────────────────────────────────┘
 DONE
 echo -e "${RESET}"
-echo -e "  ${WHITE}${BOLD}Dashboard${RESET}    http://YOUR_SERVER_IP:${APP_PORT}"
+echo -e "  ${WHITE}${BOLD}Dashboard${RESET}    ${DASH_DOMAIN}"
+echo -e "  ${WHITE}${BOLD}Direct${RESET}       http://YOUR_SERVER_IP:${APP_PORT}"
 echo -e "  ${WHITE}${BOLD}Panel URL${RESET}    ${PANEL_URL}"
 echo -e "  ${WHITE}${BOLD}Install Dir${RESET}  ${INSTALL_DIR}"
 echo ""
-echo -e "  ${YELLOW}${BOLD}⚠  One more step — add your Pterodactyl API key:${RESET}"
-echo -e "  ${DIM}  1. nano ${INSTALL_DIR}/settings.json${RESET}"
-echo -e "  ${DIM}  2. Replace \"ptla_REPLACEME\" with your Application API key${RESET}"
-echo -e "  ${DIM}     (Pterodactyl admin → Application API → Create key)${RESET}"
-echo -e "  ${DIM}  3. pm2 restart ${SERVICE_NAME}${RESET}"
+echo -e "  ${WHITE}${BOLD}Admin Login${RESET}"
+echo -e "  ${DIM}  Default: admin / admin123${RESET}"
+echo -e "  ${DIM}  Custom:  ${ADMIN_USERNAME} / (your password)${RESET}"
 echo ""
 echo -e "  ${DIM}Commands:  pm2 logs ${SERVICE_NAME}  |  pm2 restart ${SERVICE_NAME}  |  pm2 stop ${SERVICE_NAME}${RESET}"
 echo ""
